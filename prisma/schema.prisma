@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Name {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  registrations Registration[]
+
+  @@map("names")
+}
+
+model Registration {
+  inscriptionId          String @id @map("inscription_id")
+  inscriptionContent     String @map("inscription_content")
+  inscriptionContentType String @map("inscription_content_type")
+  inscriptionOwner       String @map("inscription_owner")
+  minter                 String
+  sat                    String
+  // output                 String
+  location               String
+  timestamp              BigInt
+  genesisHeight          Int    @map("genesis_height")
+  outputValue            BigInt @map("output_value")
+  genesisTransaction     String @map("genesis_transaction")
+  inscriptionIndex       Int    @map("inscription_index")
+  // txIndex                Int    @map("tx_index")
+  inscriptionJSON        Json   @map("inscription_json")
+  nameId                 Int    @map("name_id")
+  name                   Name   @relation(fields: [nameId], references: [id])
+
+  @@map("registrations")
+}
+
+model Syncs {
+  id               Int    @id @default(autoincrement())
+  timestamp        BigInt
+  inscriptionIndex Int    @map("inscription_index")
+  version          Int?
+
+  @@map("syncs")
+}

@@ -158,6 +158,7 @@ export async function fetchNamesCSV(db: PrismaClient) {
     select *
     from regs
     order by "inscriptionIndex" desc
+    limit 10000
   `;
 
   let data = "Name,Inscription Index,Inscription ID\n";

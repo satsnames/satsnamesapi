@@ -5,6 +5,7 @@ import { WritableInscription } from "../sync";
 import { InscriptionContent, validateSnsInscription } from "../validator";
 import { Ordinals } from "./client";
 import { OpenAPIConfig } from "./client/core/OpenAPI";
+import sortBy from "lodash-es/sortBy";
 
 type InscriptionsService = Ordinals["inscriptions"];
 
@@ -58,10 +59,11 @@ export async function fetchOrdinalContent(id: string) {
 
 export async function filterInscriptions(list: OrdinalsListResponse) {
   const { results, ...rest } = list;
-  const maxId = results.at(-1)?.number;
+  const sorted = sortBy(results, "number");
+  const maxId = sorted.at(-1)?.number;
   const inscriptions = (
     await Promise.all(
-      list.results.map(async (inscription) => {
+      sorted.map(async (inscription) => {
         const { id } = inscription;
         const content = await filterQueue.add(() => fetchOrdinalContent(id));
         if (typeof content !== "string") {

@@ -1,5 +1,9 @@
-// import { fetchOrdinals, filterInscriptions } from "../src/ordinals-api";
-import { fetchAndFilterInscriptions } from "../src/ord-api";
+import {
+  fetchOrdinals,
+  filterInscriptions,
+  fetchAndFilterInscriptions,
+} from "../src/ordinals-api";
+// import { fetchAndFilterInscriptions } from "../src/ord-api";
 
 const [indexStr] = process.argv.slice(2);
 
@@ -9,6 +13,7 @@ async function run() {
   // const list = await fetchOrdinals(index - 1);
   // const filtered = await filterInscriptions(list);
   console.log(filtered.inscriptions.map((i) => i._name));
+  console.log("max ID:", filtered.maxId);
 }
 
 run()

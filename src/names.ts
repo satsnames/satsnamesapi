@@ -157,7 +157,7 @@ export async function fetchNamesCSV(db: PrismaClient) {
 
     select *
     from regs
-    order by "inscriptionIndex" desc
+    order by "inscriptionIndex" asc
     limit 10000
   `;
 

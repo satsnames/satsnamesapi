@@ -65,27 +65,28 @@ export async function saveRegistrations(
     inscriptions.map(async (i) => {
       await writeQueue.add(async () => {
         const { _name: name, ...data } = i;
-        const nameExist = await db.name.findFirst({
-          where: {
-            name,
-          },
-        });
-        if (nameExist) {
-          log.debug(
-            {
-              name,
-            },
-            `Existing name! ${name}`
-          );
-        } else {
-          log.debug(
-            {
-              name,
-            },
-            `Brand new name! ${name}`
-          );
-        }
         try {
+          const nameExist = await db.name.findFirst({
+            where: {
+              name,
+            },
+          });
+          if (nameExist) {
+            log.debug(
+              {
+                name,
+              },
+              `Existing name! ${name}`
+            );
+          } else {
+            log.debug(
+              {
+                name,
+              },
+              `Brand new name! ${name}`
+            );
+          }
+
           await db.registration.upsert({
             where: {
               inscriptionId: i.inscriptionId,
@@ -135,7 +136,7 @@ export function makeSyncJob(db: PrismaClient) {
           running = false;
           logger.error(error);
           log.error({ error }, "Sync task error");
-          throw error;
+          // throw error;
         });
     },
     (err) => {

@@ -15,7 +15,7 @@ const log = logger.child({
 });
 
 export class OwnerSync {
-  db: PrismaClient;
+  readonly db: PrismaClient;
 
   constructor(db: PrismaClient) {
     this.db = db;
@@ -53,7 +53,7 @@ export class OwnerSync {
       take: 150,
     });
 
-    await Promise.all(inscriptions.map(this.updateInscription));
+    await Promise.all(inscriptions.map((i) => this.updateInscription(i)));
 
     const len = inscriptions.length;
 
@@ -101,11 +101,24 @@ export class OwnerSync {
   }
 }
 
+let running = false;
+
 export function makeOwnerSyncJob(db: PrismaClient) {
   const task = new AsyncTask(
     "sync-owners",
-    () => {
-      return new OwnerSync(db).syncFromIndex();
+    async () => {
+      if (running) return;
+
+      running = true;
+      return new OwnerSync(db)
+        .syncFromIndex()
+        .catch((e) => {
+          console.error(e);
+          logger.error({ error: e }, "Exception when syncing owner");
+        })
+        .finally(() => {
+          running = false;
+        });
     },
     (err) => {
       log.error(

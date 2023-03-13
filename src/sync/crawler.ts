@@ -1,13 +1,10 @@
 import { PrismaClient, Prisma } from "@prisma/client";
-import {
-  fetchOrdinals,
-  filterInscriptions,
-  InscriptionWithContent,
-} from "../ordinals-api";
 import { logger } from "../logger";
 import { SimpleIntervalJob, AsyncTask } from "toad-scheduler";
-import { SYNC_VERSION } from "./index";
+import { SYNC_VERSION, WritableInscription } from "./index";
 import PQueue from "p-queue";
+// import { fetchAndFilterInscriptions } from "../ord-api";
+import { fetchAndFilterInscriptions } from "../ordinals-api";
 
 const log = logger.child({
   topic: "sync",
@@ -32,9 +29,7 @@ export async function syncViaCrawl(db: PrismaClient) {
     `Starting sync from height ${height}`
   );
 
-  const allResults = await fetchOrdinals(height);
-
-  const { inscriptions, maxId } = await filterInscriptions(allResults);
+  const { inscriptions, maxId } = await fetchAndFilterInscriptions(height);
 
   await saveRegistrations(inscriptions, db);
 
@@ -63,13 +58,13 @@ const writeQueue = new PQueue({
 });
 
 export async function saveRegistrations(
-  inscriptions: InscriptionWithContent[],
+  inscriptions: WritableInscription[],
   db: PrismaClient
 ) {
   await Promise.all(
     inscriptions.map(async (i) => {
       await writeQueue.add(async () => {
-        const name = i.op.name.toLowerCase().trim();
+        const { _name: name, ...data } = i;
         const nameExist = await db.name.findFirst({
           where: {
             name,
@@ -90,32 +85,10 @@ export async function saveRegistrations(
             `Brand new name! ${name}`
           );
         }
-        const data: Prisma.RegistrationCreateInput = {
-          inscriptionId: i.id,
-          inscriptionContent: i.textContent,
-          inscriptionContentType: i["content_type"],
-          inscriptionJSON:
-            i.op as Prisma.RegistrationCreateInput["inscriptionJSON"],
-          inscriptionIndex: i.number,
-          inscriptionOwner: i.address,
-          minter: i.address,
-          sat: i.sat_ordinal,
-          location: i.location,
-          timestamp: BigInt(new Date(i.timestamp).getTime()),
-          genesisHeight: i.genesis_block_height,
-          genesisTransaction: i.genesis_tx_id,
-          outputValue: BigInt(i.value),
-          name: {
-            connectOrCreate: {
-              where: { name },
-              create: { name },
-            },
-          },
-        };
         try {
-          const upserted = await db.registration.upsert({
+          await db.registration.upsert({
             where: {
-              inscriptionId: i.id,
+              inscriptionId: i.inscriptionId,
             },
             create: data,
             update: data,
@@ -125,7 +98,7 @@ export async function saveRegistrations(
           logger.error(
             {
               name,
-              id: i.id,
+              id: i.inscriptionId,
               error,
               message,
             },

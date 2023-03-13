@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
 import PQueue from "p-queue";
 import { logger } from "../logger";
+import { WritableInscription } from "../sync";
 import { InscriptionContent, validateSnsInscription } from "../validator";
 import { Ordinals } from "./client";
 import { OpenAPIConfig } from "./client/core/OpenAPI";
@@ -83,5 +85,46 @@ export async function filterInscriptions(list: OrdinalsListResponse) {
     ...rest,
     maxId,
     inscriptions,
+  };
+}
+
+export function convertInscriptionToDb(
+  i: InscriptionWithContent
+): WritableInscription {
+  const name = i.op.name;
+  return {
+    _name: name,
+    inscriptionId: i.id,
+    inscriptionContent: i.textContent,
+    inscriptionContentType: i["content_type"],
+    inscriptionJSON: i.op as Prisma.RegistrationCreateInput["inscriptionJSON"],
+    inscriptionIndex: i.number,
+    inscriptionOwner: i.address,
+    minter: i.address,
+    sat: i.sat_ordinal,
+    location: i.location,
+    timestamp: BigInt(new Date(i.timestamp).getTime()),
+    genesisHeight: i.genesis_block_height,
+    genesisTransaction: i.genesis_tx_id,
+    outputValue: BigInt(i.value),
+    name: {
+      connectOrCreate: {
+        where: { name },
+        create: { name },
+      },
+    },
+  };
+}
+
+export async function fetchAndFilterInscriptions(startHeight: number): Promise<{
+  maxId?: number;
+  inscriptions: WritableInscription[];
+}> {
+  const list = await fetchOrdinals(startHeight);
+  const filtered = await filterInscriptions(list);
+
+  return {
+    maxId: filtered.maxId,
+    inscriptions: filtered.inscriptions.map(convertInscriptionToDb),
   };
 }

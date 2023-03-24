@@ -25,7 +25,7 @@ export async function makeApp() {
   await app.register(RateLimiter, {
     max: 50,
     keyGenerator(req) {
-      const prodId = req.headers["Fly-Client-IP"];
+      const prodId = req.headers["fly-client-ip"];
       if (typeof prodId === "string") return prodId;
       return req.ip;
     },

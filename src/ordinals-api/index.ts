@@ -44,7 +44,7 @@ export async function fetchOrdinals(
     limit: 60,
     // orderBy: "ordinal",
     order: "asc",
-    mimeType: ["text/plain"],
+    mimeType: ["text/plain", "application/json"],
   });
 
   return list;

@@ -4,3 +4,4 @@ node_modules
 fly.toml
 fly.worker.toml
 pg
+fly.worker2.toml

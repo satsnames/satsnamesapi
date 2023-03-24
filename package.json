@@ -6,8 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "NODE_ENV=production tsx scripts/server.ts",
-    "dev": "NODE_ENV=development tsx watch scripts/server.ts",
-    "r": "NODE_ENV=development tsx",
+    "dev": "NODE_ENV=development tsx watch -r dotenv/config scripts/server.ts",
+    "r": "NODE_ENV=development tsx -r dotenv/config",
     "rt": "LOG_LEVEL=trace NODE_ENV=development tsx",
     "typecheck": "tsc --noEmit",
     "generate:openapi": "pnpm openapi -i ./static/openapi.json -c axios -o src/ordinals-api/client --useOptions --name Ordinals --useUnionTypes"
@@ -44,5 +44,9 @@
     "tsx": "^3.12.3",
     "typescript": "^4.9.5",
     "zod": "^3.20.6"
+  },
+  "devDependencies": {
+    "dotenv": "^16.0.3",
+    "dotenv-cli": "^7.1.0"
   }
 }

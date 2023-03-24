@@ -12,15 +12,21 @@ Install dependencies:
 pnpm install
 ```
 
-Create a `.env` file with `DATABASE_URL` pointing to a Postgres database URL.
+Create a `.env` file with `DATABASE_URL` pointing to a Postgres database URL. You'll need to have Postgres installed and running on your machine.
 
 ```dotenv
 DATABASE_URL="postgresql://localhost:5432/sats-api-dev"
 ```
 
+Setup the DB migrations with:
+
+```bash
+pnpm prisma migrate dev
+```
+
 Finally, run the server with:
 
-```pnpm
+```bash
 pnpm dev
 ```
 

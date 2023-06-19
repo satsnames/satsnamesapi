@@ -14,7 +14,7 @@ export class StatusService {
      * @returns any Default Response
      * @throws ApiError
      */
-    public getOrdinalsV1(): CancelablePromise<{
+    public getApiStatus(): CancelablePromise<{
         server_version: string;
         status: string;
         block_height?: number;

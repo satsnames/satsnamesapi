@@ -2,9 +2,13 @@ import { PrismaClient, Registration } from "@prisma/client";
 import PQueue from "p-queue";
 import { AsyncTask, SimpleIntervalJob } from "toad-scheduler";
 import { logger } from "../logger";
-import { inscriptionsClient } from "../ordinals-api";
+import {
+  OrdinalBlockTransfers,
+  hiroStatusClient,
+  inscriptionsClient,
+} from "../ordinals-api";
 
-export const OWNERS_SYNC_ID = 2;
+export const OWNERS_SYNC_ID = 999999;
 
 const syncQueue = new PQueue({
   concurrency: 9,
@@ -21,83 +25,144 @@ export class OwnerSync {
     this.db = db;
   }
 
-  async syncFromIndex(registration?: {
-    inscriptionId: string;
-    inscriptionIndex: number;
-    inscriptionOwner: string;
-  }): Promise<true> {
-    let id = registration?.inscriptionId;
-    const isFirst = typeof id === "undefined";
-
-    if (isFirst) {
-      log.info("Starting owner sync");
-    } else {
-      log.info(`Continuing owner sync from ${registration!.inscriptionIndex}`);
-    }
-
-    const inscriptions = await this.db.registration.findMany({
+  async startSync() {
+    const maxSync = await this.db.syncs.findFirst({
       orderBy: {
-        inscriptionIndex: "asc",
+        inscriptionIndex: "desc",
       },
-      select: {
-        inscriptionId: true,
-        inscriptionIndex: true,
-        inscriptionOwner: true,
+      where: {
+        version: OWNERS_SYNC_ID,
       },
-      skip: isFirst ? 0 : 1,
-      cursor: isFirst
-        ? undefined
-        : {
-            inscriptionId: id,
-          },
-      take: 150,
     });
 
-    await Promise.all(inscriptions.map((i) => this.updateInscription(i)));
-
-    const len = inscriptions.length;
-
-    if (len === 0) {
-      log.info("Owner sync done!");
-      return true;
-    } else {
-      const last = inscriptions[len - 1];
-      return this.syncFromIndex(last);
+    let startHeight = maxSync?.inscriptionIndex;
+    if (typeof startHeight === "undefined") {
+      startHeight = 777735;
     }
+
+    startHeight = startHeight + 1;
+
+    const hiroStatus = await hiroStatusClient.getApiStatus();
+    const maxHeight = hiroStatus.block_height ?? startHeight + 1;
+
+    log.info(
+      {
+        height: startHeight,
+        maxHeight,
+      },
+      "Starting block sync"
+    );
+
+    if (startHeight === maxHeight) {
+      return true;
+    }
+
+    await this.syncBlock({
+      height: startHeight,
+    });
+
+    await this.db.syncs.create({
+      data: {
+        version: OWNERS_SYNC_ID,
+        inscriptionIndex: startHeight,
+        timestamp: new Date().getTime(),
+      },
+    });
+
+    return false;
   }
 
-  async updateInscription(i: {
-    inscriptionId: string;
-    inscriptionOwner: string;
-    inscriptionIndex: number;
-  }) {
-    const data = await syncQueue.add(() =>
-      inscriptionsClient.getOrdinalsV1Inscriptions1({
-        id: i.inscriptionId,
+  async syncBlock({
+    height,
+    // maxHeight,
+    offset = 0,
+  }: {
+    height: number;
+    // maxHeight: number;
+    offset?: number;
+  }): Promise<boolean> {
+    const limit = 60;
+    log.debug(
+      {
+        height,
+        offset,
+      },
+      "Syncing owners for block"
+    );
+    const transfers = await inscriptionsClient.getTransfersPerBlock({
+      limit,
+      block: String(height),
+      offset,
+    });
+
+    if (transfers.results.length === 0) {
+      return true;
+    }
+
+    const ids = transfers.results.map((t) => t.id);
+
+    const regs = await this.db.registration.findMany({
+      where: {
+        inscriptionId: {
+          in: ids,
+        },
+      },
+    });
+
+    log.debug(
+      {
+        height,
+        registrations: regs.length,
+      },
+      `Updating owners for ${regs.length} registrations`
+    );
+
+    await Promise.all(
+      regs.map(async (r) => {
+        await syncQueue.add(() => {
+          return this.updateWithTransfer(r, transfers.results);
+        });
       })
     );
-    if (!data) return;
 
-    const owner = data.address;
-    if (owner !== i.inscriptionOwner) {
-      log.info(
-        {
-          index: i.inscriptionIndex,
-          old: i.inscriptionOwner,
-          new: owner,
-        },
-        "New owner!"
-      );
-      await this.db.registration.update({
-        where: {
-          inscriptionId: i.inscriptionId,
-        },
-        data: {
-          inscriptionOwner: owner,
-          location: data.location,
-        },
-      });
+    if (offset + limit > transfers.total) {
+      return true;
     }
+    return this.syncBlock({
+      height,
+      offset: offset ?? 0 + limit,
+    });
+  }
+
+  async updateWithTransfer(
+    registration: Registration,
+    transfers: OrdinalBlockTransfers
+  ) {
+    const transfer = transfers.find((t) => t.id === registration.inscriptionId);
+    const newOwner = transfer?.to.address;
+    if (!transfer || !newOwner) return;
+    await this.db.registration.update({
+      where: {
+        inscriptionId: registration.inscriptionId,
+      },
+      data: {
+        inscriptionOwner: newOwner,
+        location: transfer.to.location,
+        outputValue: transfer.to.value
+          ? BigInt(transfer.to.value)
+          : registration.outputValue,
+      },
+    });
+  }
+}
+
+async function syncOwners(db: PrismaClient) {
+  const syncer = new OwnerSync(db);
+  const done = await syncer.startSync();
+  if (done) {
+    log.info("Owner sync done!");
+  } else {
+    await syncOwners(db);
   }
 }
 
@@ -110,8 +175,7 @@ export function makeOwnerSyncJob(db: PrismaClient) {
       if (running) return;
 
       running = true;
-      return new OwnerSync(db)
-        .syncFromIndex()
+      return syncOwners(db)
         .catch((e) => {
           console.error(e);
           logger.error({ error: e }, "Exception when syncing owner");
@@ -130,7 +194,7 @@ export function makeOwnerSyncJob(db: PrismaClient) {
     }
   );
 
-  return new SimpleIntervalJob({ hours: 1, runImmediately: true }, task, {
+  return new SimpleIntervalJob({ minutes: 10, runImmediately: true }, task, {
     preventOverrun: true,
   });
 }

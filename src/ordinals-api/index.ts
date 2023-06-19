@@ -10,8 +10,14 @@ import sortBy from "lodash-es/sortBy";
 type InscriptionsService = Ordinals["inscriptions"];
 
 export type OrdinalsListResponse = Awaited<
-  ReturnType<InscriptionsService["getOrdinalsV1Inscriptions"]>
+  ReturnType<InscriptionsService["getInscriptions"]>
 >;
+
+export type OrdinalBlockTransferResponse = Awaited<
+  ReturnType<InscriptionsService["getTransfersPerBlock"]>
+>;
+
+export type OrdinalBlockTransfers = OrdinalBlockTransferResponse["results"];
 
 export type OrdinalsListItem = OrdinalsListResponse["results"][number];
 
@@ -22,6 +28,7 @@ export type InscriptionWithContent = OrdinalsListItem & {
 
 export const apiClient = new Ordinals();
 export const inscriptionsClient = apiClient.inscriptions;
+export const hiroStatusClient = apiClient.status;
 export const API_URL = new Ordinals().request.config.BASE;
 
 function getFilterConcurrency() {
@@ -39,9 +46,10 @@ const filterQueue = new PQueue({
 export async function fetchOrdinals(
   fromIndex: number
 ): Promise<OrdinalsListResponse> {
-  const list = await inscriptionsClient.getOrdinalsV1Inscriptions({
+  const list = await inscriptionsClient.getInscriptions({
     fromNumber: fromIndex + 1,
     limit: 60,
+    toNumber: fromIndex + 1000,
     // orderBy: "ordinal",
     order: "asc",
     mimeType: ["text/plain", "application/json"],
@@ -101,14 +109,14 @@ export function convertInscriptionToDb(
     inscriptionContentType: i["content_type"],
     inscriptionJSON: i.op as Prisma.RegistrationCreateInput["inscriptionJSON"],
     inscriptionIndex: i.number,
-    inscriptionOwner: i.address,
-    minter: i.address,
+    inscriptionOwner: i.address || "",
+    minter: i.address || "",
     sat: i.sat_ordinal,
     location: i.location,
     timestamp: BigInt(new Date(i.timestamp).getTime()),
     genesisHeight: i.genesis_block_height,
     genesisTransaction: i.genesis_tx_id,
-    outputValue: BigInt(i.value),
+    outputValue: BigInt(i.value ?? 0),
     name: {
       connectOrCreate: {
         where: { name },

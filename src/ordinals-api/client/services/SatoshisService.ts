@@ -14,7 +14,7 @@ export class SatoshisService {
      * @returns any Default Response
      * @throws ApiError
      */
-    public getOrdinalsV1Sats({
+    public getSatoshi({
         ordinal,
     }: {
         /**

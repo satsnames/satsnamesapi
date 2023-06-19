@@ -10,7 +10,7 @@
     "r": "NODE_ENV=development tsx -r dotenv/config",
     "rt": "LOG_LEVEL=trace NODE_ENV=development tsx",
     "typecheck": "tsc --noEmit",
-    "generate:openapi": "pnpm openapi -i ./static/openapi.json -c axios -o src/ordinals-api/client --useOptions --name Ordinals --useUnionTypes"
+    "generate:openapi": "pnpm openapi -i https://ordinals-api.vercel.app/openapi.yaml -c axios -o src/ordinals-api/client --useOptions --name Ordinals --useUnionTypes"
   },
   "keywords": [],
   "license": "ISC",
